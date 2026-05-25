@@ -89,42 +89,41 @@ def parse_business_card(image_url: str, supplement_text: str = "") -> str:
     base_text = (
         "请提取名片信息并结合销售补充文本进行语义槽填充。\n\n"
         f"销售补充文本：{supplement_text or '（无）'}\n\n"
-        "请输出如下JSON格式（无法确定的字段留空字符串）。\n"
-        "重要约束：以下字段是CRM中真实存在的列，严禁输出任何不在这个列表中的字段名：\n"
-        "- company_name: 公司全称\n"
-        "- company_alias: 公司别名/简称\n"
-        "- country_region: 国家/地区\n"
-        "- city: 城市\n"
-        "- address: 公司地址\n"
-        "- website: 官网链接（仅域名，去除协议前缀）\n"
-        "- contact_name: 联系人姓名\n"
-        "- contact_title: 职位\n"
-        "- email: 邮箱\n"
-        "- phone: 电话/手机（优先采用手写修改后的号码）\n"
-        "- social_account: 社交账号/即时通讯\n"
-        "- customer_type: 客户分类（直接客户/代理商/分销商/独立采购商）\n"
-        "- value_tag: 价值标签（战略级/高管熟人/高意向/普通）\n"
-        "- scene_notes: 现场跟进备注（必须包含：意向产品、预计需求量、下一步行动、线索来源等所有销售碎片信息，合并写入此字段）\n"
+        "请输出如下JSON格式。\n"
+        "【绝对约束】飞书CRM中只有以下6个字段是真实存在的，严禁输出任何其他键名：\n"
+        "- 公司名称: 公司全称（无法确定则留空字符串\"\"）\n"
+        "- 官网: 官网链接（仅域名，去除协议前缀；无法确定则留空字符串\"\"，绝对禁止传null）\n"
+        "- 邮箱: 联系人邮箱（无法确定则留空字符串\"\"，绝对禁止传null）\n"
+        "- 跟进记录/展会备注: 大文本字段，必须按下方Markdown格式写入所有碎片信息\n"
+        "- 数据状态: 固定枚举，只能从 [\"待跟进\", \"调研中\", \"调研完成\"] 中选择，名片录入时默认为\"待跟进\"\n"
         "\n"
-        "注意：意向产品、预计需求量、下一步行动、线索来源等信息不要作为独立字段输出，"
-        "必须全部合并写入 scene_notes（现场跟进备注）中，格式清晰便于阅读。\n"
+        "【碎片信息合并规则】名片和补充文本中除了公司名称、官网、邮箱之外的所有信息，"
+        "包括但不限于：联系人姓名、职位、电话、国家/地区、城市、地址、社交账号、客户分类、价值标签、"
+        "意向产品、预计需求量、下一步行动、线索来源等，"
+        "必须全部合并到\"跟进记录/展会备注\"中，采用如下严格格式（不要遗漏任何信息）：\n\n"
+        "【YYYY年MM月DD日展会录入】\n"
+        "- 联系人姓名：[具体姓名，若无写未知]\n"
+        "- 职位：[具体职位，若无写未知]\n"
+        "- 电话：[具体电话，若无写未知]\n"
+        "- 国家/地区：[如：德国/英国/未知]\n"
+        "- 城市：[具体城市，若无写未知]\n"
+        "- 公司地址：[具体地址，若无写未知]\n"
+        "- 社交账号/即时通讯：[如有填写，若无写未知]\n"
+        "- 客户分类：[直接客户/代理商/分销商/独立采购商/未知]\n"
+        "- 价值标签：[战略级/高管熟人/高意向/普通/未知]\n"
+        "- 线索来源：[如：展会现场/代理商推荐/未知]\n"
+        "- 意向产品：[具体产品，若无写未知]\n"
+        "- 预计需求量：[具体需求量描述，若无写未知]\n"
+        "- 下一步行动：[后续跟进计划，若无写未知]\n"
+        "- 销售现场补充：[原文或摘要]\n"
         "\n"
         "JSON格式示例：\n"
         "{\n"
-        '  "company_name": "Müller Automation GmbH",\n'
-        '  "company_alias": "Müller Auto",\n'
-        '  "country_region": "德国",\n'
-        '  "city": "慕尼黑",\n'
-        '  "address": "",\n'
-        '  "website": "mueller-auto.de",\n'
-        '  "contact_name": "Hans Müller",\n'
-        '  "contact_title": "CEO",\n'
-        '  "email": "h.mueller@mueller-auto.de",\n'
-        '  "phone": "",\n'
-        '  "social_account": "",\n'
-        '  "customer_type": "直接客户",\n'
-        '  "value_tag": "高意向",\n'
-        '  "scene_notes": "[线索来源] 2026海外展会\\n[意向产品] 工业网关\\n[预计需求量] 500台/年\\n[下一步行动] 下周发样品\\n[销售补充] 对工业网关很感兴趣"\n'
+        '  "公司名称": "Müller Automation GmbH",\n'
+        '  "官网": "mueller-auto.de",\n'
+        '  "邮箱": "h.mueller@mueller-auto.de",\n'
+        '  "跟进记录/展会备注": "【2026年05月23日展会录入】\\n- 联系人姓名：Hans Müller\\n- 职位：CEO\\n- 电话：未知\\n- 国家/地区：德国\\n- 城市：慕尼黑\\n- 公司地址：未知\\n- 社交账号/即时通讯：未知\\n- 客户分类：直接客户\\n- 价值标签：高意向\\n- 线索来源：2026海外展会\\n- 意向产品：工业网关\\n- 预计需求量：500台/年\\n- 下一步行动：下周发样品\\n- 销售现场补充：对工业网关很感兴趣，预计今年采购500台，下周回国后要发样品。",\n'
+        '  "数据状态": "待跟进"\n'
         "}"
     )
 
@@ -163,10 +162,27 @@ def parse_business_card(image_url: str, supplement_text: str = "") -> str:
         "名片图片暂时无法访问或解析。请仅基于以下销售补充文本，"
         "尽可能提取和推断结构化线索信息，并以相同JSON格式输出。\n\n"
         f"销售补充文本：{supplement_text or '（无）'}\n\n"
-        "重要约束：只输出以下字段：company_name, company_alias, country_region, city, address, "
-        "website, contact_name, contact_title, email, phone, social_account, customer_type, value_tag, scene_notes。"
-        "严禁输出 interest_product, estimated_volume, next_step, source 等独立字段。"
-        "所有销售碎片信息（意向产品、预计需求量、下一步行动、线索来源）必须全部合并写入 scene_notes。"
+        "【绝对约束】飞书CRM中只有以下6个字段是真实存在的，严禁输出任何其他键名：\n"
+        "- 公司名称、官网、邮箱、跟进记录/展会备注、数据状态\n"
+        "除公司名称/官网/邮箱外，所有碎片信息（联系人、职位、电话、国家/地区、城市、地址、"
+        "社交账号、客户分类、价值标签、意向产品、预计需求量、下一步行动、线索来源等）"
+        "必须全部合并到\"跟进记录/展会备注\"字段中，采用如下严格格式：\n\n"
+        "【YYYY年MM月DD日展会录入】\n"
+        "- 联系人姓名：[具体姓名，若无写未知]\n"
+        "- 职位：[具体职位，若无写未知]\n"
+        "- 电话：[具体电话，若无写未知]\n"
+        "- 国家/地区：[如：德国/英国/未知]\n"
+        "- 城市：[具体城市，若无写未知]\n"
+        "- 公司地址：[具体地址，若无写未知]\n"
+        "- 社交账号/即时通讯：[如有填写，若无写未知]\n"
+        "- 客户分类：[直接客户/代理商/分销商/独立采购商/未知]\n"
+        "- 价值标签：[战略级/高管熟人/高意向/普通/未知]\n"
+        "- 线索来源：[如：展会现场/代理商推荐/未知]\n"
+        "- 意向产品：[具体产品，若无写未知]\n"
+        "- 预计需求量：[具体需求量描述，若无写未知]\n"
+        "- 下一步行动：[后续跟进计划，若无写未知]\n"
+        "- 销售现场补充：[原文或摘要]\n"
+        "\n数据状态只能从 [\"待跟进\", \"调研中\", \"调研完成\"] 中选择，名片录入时默认为\"待跟进\"。"
     )
     messages = [
         SystemMessage(content=system_prompt),
@@ -234,9 +250,9 @@ def check_crm_duplicate(company_name: str, website: str = "", email: str = "",
     except Exception as e:
         return json.dumps({"error": f"按名称搜索失败: {e}"}, ensure_ascii=False)
 
-    # 2. 按官网精确搜索
+    # 2. 按官网精确搜索（空值/非字符串直接跳过）
     norm_web = _normalize_website(website)
-    if norm_web:
+    if norm_web and isinstance(website, str):
         try:
             web_results = client.search_by_website(app_token, table_id, website)
             for r in web_results:
@@ -252,9 +268,9 @@ def check_crm_duplicate(company_name: str, website: str = "", email: str = "",
         except Exception:
             pass
 
-    # 3. 按邮箱后缀搜索
+    # 3. 按邮箱后缀搜索（空值/非字符串直接跳过）
     domain = _extract_domain_from_email(email)
-    if domain:
+    if domain and isinstance(email, str):
         try:
             mail_results = client.search_by_email_suffix(app_token, table_id, email)
             for r in mail_results:
@@ -294,6 +310,36 @@ def check_crm_duplicate(company_name: str, website: str = "", email: str = "",
     return json.dumps(result, ensure_ascii=False, indent=2)
 
 
+# 飞书CRM允许写入的字段白名单（严格）
+_CRM_FIELD_WHITELIST = {
+    "公司名称", "官网", "邮箱",
+    "跟进记录/展会备注", "AI调研报告链接", "数据状态"
+}
+
+# 数据状态合法枚举值
+_CRM_STATUS_ENUM = {"待跟进", "调研中", "调研完成"}
+
+
+def _sanitize_crm_fields(fields: dict) -> dict:
+    """清洗并校验要写入CRM的字段，只保留白名单中的键，过滤非法值"""
+    sanitized = {}
+    for k, v in fields.items():
+        if k not in _CRM_FIELD_WHITELIST:
+            continue
+        # 强制字符串类型处理（官网/邮箱/公司名称/备注/报告链接）
+        if v is None or v is False:
+            continue
+        if k == "数据状态":
+            sv = str(v).strip()
+            if sv in _CRM_STATUS_ENUM:
+                sanitized[k] = sv
+            else:
+                sanitized[k] = "待跟进"
+        else:
+            sanitized[k] = str(v).strip() if v else ""
+    return sanitized
+
+
 @tool
 def write_crm_record(record_json: str, mode: str = "create", record_id: str = "",
                      app_token: str = "", table_id: str = "") -> str:
@@ -319,25 +365,41 @@ def write_crm_record(record_json: str, mode: str = "create", record_id: str = ""
     except Exception as e:
         return json.dumps({"error": f"record_json 解析失败: {e}"}, ensure_ascii=False)
 
+    if not isinstance(fields, dict):
+        return json.dumps({"error": "record_json 必须是一个对象字典"}, ensure_ascii=False)
+
+    # 硬拦截：只保留白名单字段，过滤空值/null
+    safe_fields = _sanitize_crm_fields(fields)
+    removed = [k for k in fields if k not in _CRM_FIELD_WHITELIST]
+
+    if not safe_fields:
+        return json.dumps({
+            "error": "字段校验失败：record_json 中无可合法写入的字段",
+            "removed_keys": removed,
+            "hint": "只允许以下字段：公司名称、官网、邮箱、跟进记录/展会备注、AI调研报告链接、数据状态"
+        }, ensure_ascii=False)
+
     client = FeishuCrmClient()
     try:
         if mode == "update":
             if not record_id:
                 return json.dumps({"error": "update 模式需要提供 record_id"}, ensure_ascii=False)
-            result = client.update_record(app_token, table_id, record_id, fields)
+            result = client.update_record(app_token, table_id, record_id, safe_fields)
             return json.dumps({
                 "success": True,
                 "mode": "update",
                 "record_id": result.get("record_id"),
-                "fields": result.get("fields", {})
+                "fields": result.get("fields", {}),
+                "removed_keys": removed
             }, ensure_ascii=False)
         else:
-            result = client.create_record(app_token, table_id, fields)
+            result = client.create_record(app_token, table_id, safe_fields)
             return json.dumps({
                 "success": True,
                 "mode": "create",
                 "record_id": result.get("record_id"),
-                "fields": result.get("fields", {})
+                "fields": result.get("fields", {}),
+                "removed_keys": removed
             }, ensure_ascii=False)
     except Exception as e:
         return json.dumps({"error": f"CRM写入失败: {e}"}, ensure_ascii=False)
