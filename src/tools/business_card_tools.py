@@ -89,26 +89,42 @@ def parse_business_card(image_url: str, supplement_text: str = "") -> str:
     base_text = (
         "请提取名片信息并结合销售补充文本进行语义槽填充。\n\n"
         f"销售补充文本：{supplement_text or '（无）'}\n\n"
-        "请输出如下JSON格式（无法确定的字段留空字符串）：\n"
+        "请输出如下JSON格式（无法确定的字段留空字符串）。\n"
+        "重要约束：以下字段是CRM中真实存在的列，严禁输出任何不在这个列表中的字段名：\n"
+        "- company_name: 公司全称\n"
+        "- company_alias: 公司别名/简称\n"
+        "- country_region: 国家/地区\n"
+        "- city: 城市\n"
+        "- address: 公司地址\n"
+        "- website: 官网链接（仅域名，去除协议前缀）\n"
+        "- contact_name: 联系人姓名\n"
+        "- contact_title: 职位\n"
+        "- email: 邮箱\n"
+        "- phone: 电话/手机（优先采用手写修改后的号码）\n"
+        "- social_account: 社交账号/即时通讯\n"
+        "- customer_type: 客户分类（直接客户/代理商/分销商/独立采购商）\n"
+        "- value_tag: 价值标签（战略级/高管熟人/高意向/普通）\n"
+        "- scene_notes: 现场跟进备注（必须包含：意向产品、预计需求量、下一步行动、线索来源等所有销售碎片信息，合并写入此字段）\n"
+        "\n"
+        "注意：意向产品、预计需求量、下一步行动、线索来源等信息不要作为独立字段输出，"
+        "必须全部合并写入 scene_notes（现场跟进备注）中，格式清晰便于阅读。\n"
+        "\n"
+        "JSON格式示例：\n"
         "{\n"
-        '  "company_name": "公司全称",\n'
-        '  "company_alias": "公司别名/简称",\n'
-        '  "country_region": "国家/地区",\n'
-        '  "city": "城市",\n'
-        '  "address": "公司地址",\n'
-        '  "website": "官网链接（仅域名，去除协议前缀）",\n'
-        '  "contact_name": "联系人姓名",\n'
-        '  "contact_title": "职位",\n'
-        '  "email": "邮箱",\n'
-        '  "phone": "电话/手机（优先采用手写修改后的号码）",\n'
-        '  "social_account": "社交账号/即时通讯",\n'
-        '  "customer_type": "客户分类：直接客户/代理商/分销商/独立采购商",\n'
-        '  "value_tag": "价值标签：战略级/高管熟人/高意向/普通",\n'
-        '  "interest_product": "意向产品",\n'
-        '  "estimated_volume": "预计需求量",\n'
-        '  "next_step": "下一步行动",\n'
-        '  "scene_notes": "现场跟进备注",\n'
-        '  "source": "线索来源：2026海外展会"\n'
+        '  "company_name": "Müller Automation GmbH",\n'
+        '  "company_alias": "Müller Auto",\n'
+        '  "country_region": "德国",\n'
+        '  "city": "慕尼黑",\n'
+        '  "address": "",\n'
+        '  "website": "mueller-auto.de",\n'
+        '  "contact_name": "Hans Müller",\n'
+        '  "contact_title": "CEO",\n'
+        '  "email": "h.mueller@mueller-auto.de",\n'
+        '  "phone": "",\n'
+        '  "social_account": "",\n'
+        '  "customer_type": "直接客户",\n'
+        '  "value_tag": "高意向",\n'
+        '  "scene_notes": "[线索来源] 2026海外展会\\n[意向产品] 工业网关\\n[预计需求量] 500台/年\\n[下一步行动] 下周发样品\\n[销售补充] 对工业网关很感兴趣"\n'
         "}"
     )
 
@@ -147,7 +163,10 @@ def parse_business_card(image_url: str, supplement_text: str = "") -> str:
         "名片图片暂时无法访问或解析。请仅基于以下销售补充文本，"
         "尽可能提取和推断结构化线索信息，并以相同JSON格式输出。\n\n"
         f"销售补充文本：{supplement_text or '（无）'}\n\n"
-        "注意：如果文本中明确提到国家、产品意向、需求量、下一步行动等信息，请务必填入对应字段。"
+        "重要约束：只输出以下字段：company_name, company_alias, country_region, city, address, "
+        "website, contact_name, contact_title, email, phone, social_account, customer_type, value_tag, scene_notes。"
+        "严禁输出 interest_product, estimated_volume, next_step, source 等独立字段。"
+        "所有销售碎片信息（意向产品、预计需求量、下一步行动、线索来源）必须全部合并写入 scene_notes。"
     )
     messages = [
         SystemMessage(content=system_prompt),
@@ -180,6 +199,10 @@ def check_crm_duplicate(company_name: str, website: str = "", email: str = "",
     Returns:
         JSON字符串，包含匹配结果列表和去重建议
     """
+    # 强类型校验：飞书 filter value 只接受字符串/列表
+    if not company_name or not isinstance(company_name, str):
+        return json.dumps({"matches": [], "recommendation": "NO_MATCH", "reason": "公司名称为空，无法去重"}, ensure_ascii=False)
+
     app_token = app_token or get_default_app_token()
     table_id = table_id or get_default_table_id()
     if not app_token or not table_id:
@@ -192,7 +215,7 @@ def check_crm_duplicate(company_name: str, website: str = "", email: str = "",
 
     # 1. 按公司名称模糊搜索
     try:
-        name_results = client.search_by_company_name(app_token, table_id, company_name)
+        name_results = client.search_by_company_name(app_token, table_id, str(company_name))
         for r in name_results:
             rid = r.get("record_id")
             if rid in seen_ids:

@@ -48,9 +48,11 @@ class FeishuCrmClient:
     @_require_token
     def search_by_company_name(self, app_token: str, table_id: str, company_name: str, page_size: int = 100) -> list:
         """按公司名称模糊搜索记录"""
+        if not company_name or not isinstance(company_name, str):
+            return []
         filter_body = {
             "conditions": [
-                {"field_name": "公司名称", "operator": "contains", "value": company_name}
+                {"field_name": "公司名称", "operator": "contains", "value": str(company_name)}
             ],
             "conjunction": "and"
         }
@@ -65,11 +67,11 @@ class FeishuCrmClient:
     @_require_token
     def search_by_website(self, app_token: str, table_id: str, website: str, page_size: int = 100) -> list:
         """按官网精确搜索记录"""
-        if not website:
+        if not website or not isinstance(website, str):
             return []
         filter_body = {
             "conditions": [
-                {"field_name": "官网", "operator": "is", "value": website}
+                {"field_name": "官网", "operator": "is", "value": str(website)}
             ],
             "conjunction": "and"
         }
@@ -84,12 +86,12 @@ class FeishuCrmClient:
     @_require_token
     def search_by_email_suffix(self, app_token: str, table_id: str, email: str, page_size: int = 100) -> list:
         """按邮箱后缀搜索记录"""
-        if not email or "@" not in email:
+        if not email or not isinstance(email, str) or "@" not in email:
             return []
         suffix = email.split("@")[1]
         filter_body = {
             "conditions": [
-                {"field_name": "邮箱", "operator": "contains", "value": suffix}
+                {"field_name": "邮箱", "operator": "contains", "value": str(suffix)}
             ],
             "conjunction": "and"
         }
