@@ -52,7 +52,7 @@ class FeishuCrmClient:
             return []
         filter_body = {
             "conditions": [
-                {"field_name": "公司名称", "operator": "contains", "value": str(company_name)}
+                {"field_name": "公司名称", "operator": "contains", "value": [str(company_name)]}
             ],
             "conjunction": "and"
         }
@@ -71,7 +71,7 @@ class FeishuCrmClient:
             return []
         filter_body = {
             "conditions": [
-                {"field_name": "官网", "operator": "is", "value": str(website)}
+                {"field_name": "官网", "operator": "is", "value": [str(website)]}
             ],
             "conjunction": "and"
         }
@@ -91,7 +91,7 @@ class FeishuCrmClient:
         suffix = email.split("@")[1]
         filter_body = {
             "conditions": [
-                {"field_name": "邮箱", "operator": "contains", "value": str(suffix)}
+                {"field_name": "邮箱", "operator": "contains", "value": [str(suffix)]}
             ],
             "conjunction": "and"
         }
