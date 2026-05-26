@@ -34,9 +34,22 @@ def _extract_domain_from_email(email: str) -> str:
     return email.split("@")[1].strip().lower()
 
 
+def _to_str(val) -> str:
+    """将任意值安全转换为字符串（列表取第一个元素）"""
+    if val is None:
+        return ""
+    if isinstance(val, list):
+        if not val:
+            return ""
+        return str(val[0])
+    return str(val)
+
+
 def _similarity(a: str, b: str) -> float:
     """计算两个字符串的相似度 (0~1)"""
-    return SequenceMatcher(None, a.lower(), b.lower()).ratio()
+    sa = _to_str(a).lower()
+    sb = _to_str(b).lower()
+    return SequenceMatcher(None, sa, sb).ratio()
 
 
 def _run_llm_parse(ctx, messages, model: str, temperature: float, max_tokens: int):
@@ -201,17 +214,13 @@ def parse_business_card(image_url: str, supplement_text: str = "") -> str:
 
 
 @tool
-def check_crm_duplicate(company_name: str, website: str = "", email: str = "",
-                        app_token: str = "", table_id: str = "") -> str:
+def check_crm_duplicate(company_name: str, website: str = "", email: str = "") -> str:
     """检查飞书CRM中是否已存在该公司记录，支持多维度去重。
 
     Args:
         company_name: 待检查的公司名称（必填）
         website: 公司官网，用于精确匹配
         email: 联系人邮箱，用于后缀匹配
-        app_token: 飞书多维表格的 app_token（如未提供则从环境变量读取）
-        table_id: 飞书多维表格的 table_id（如未提供则从环境变量读取）
-
     Returns:
         JSON字符串，包含匹配结果列表和去重建议
     """
@@ -219,8 +228,9 @@ def check_crm_duplicate(company_name: str, website: str = "", email: str = "",
     if not company_name or not isinstance(company_name, str):
         return json.dumps({"matches": [], "recommendation": "NO_MATCH", "reason": "公司名称为空，无法去重"}, ensure_ascii=False)
 
-    app_token = app_token or get_default_app_token()
-    table_id = table_id or get_default_table_id()
+    # 强制从环境变量读取，剥夺大模型对核心资产标识的传参权
+    app_token = get_default_app_token()
+    table_id = get_default_table_id()
     if not app_token or not table_id:
         return json.dumps({"error": "缺少 app_token 或 table_id，请通过参数传入或配置环境变量"}, ensure_ascii=False)
 
@@ -341,22 +351,20 @@ def _sanitize_crm_fields(fields: dict) -> dict:
 
 
 @tool
-def write_crm_record(record_json: str, mode: str = "create", record_id: str = "",
-                     app_token: str = "", table_id: str = "") -> str:
+def write_crm_record(record_json: str, mode: str = "create", record_id: str = "") -> str:
     """向飞书CRM写入或更新记录。
 
     Args:
         record_json: JSON字符串，包含要写入的字段键值对
         mode: 操作模式，create（新增）或 update（更新）
         record_id: 更新模式时需要提供现有记录ID
-        app_token: 飞书多维表格的 app_token
-        table_id: 飞书多维表格的 table_id
 
     Returns:
         JSON字符串，包含操作结果和记录ID
     """
-    app_token = app_token or get_default_app_token()
-    table_id = table_id or get_default_table_id()
+    # 强制从环境变量读取，剥夺大模型对核心资产标识的传参权
+    app_token = get_default_app_token()
+    table_id = get_default_table_id()
     if not app_token or not table_id:
         return json.dumps({"error": "缺少 app_token 或 table_id"}, ensure_ascii=False)
 

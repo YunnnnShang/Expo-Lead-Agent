@@ -93,16 +93,13 @@ def research_company_online(company_name: str, country: str = "", website: str =
 
 @tool
 def generate_company_report(company_name: str, research_data: str,
-                            existing_info: str = "", app_token: str = "",
-                            table_id: str = "", record_id: str = "") -> str:
+                            existing_info: str = "", record_id: str = "") -> str:
     """基于调研数据生成公司背调报告PDF，并回写CRM。
 
     Args:
         company_name: 公司名称
         research_data: research_company_online 返回的JSON字符串
         existing_info: CRM中已有信息的JSON字符串（可选）
-        app_token: 飞书多维表格 app_token（回写报告链接时使用）
-        table_id: 飞书多维表格 table_id
         record_id: CRM记录ID（回写报告链接时使用）
 
     Returns:
@@ -198,9 +195,9 @@ def generate_company_report(company_name: str, research_data: str,
     except Exception as e:
         return json.dumps({"error": f"PDF生成失败: {e}", "report_markdown_preview": report_md[:500]}, ensure_ascii=False)
 
-    # 回写CRM报告链接
-    app_token = app_token or get_default_app_token()
-    table_id = table_id or get_default_table_id()
+    # 回写CRM报告链接（强制从环境变量读取，剥夺大模型传参权）
+    app_token = get_default_app_token()
+    table_id = get_default_table_id()
     if app_token and table_id and record_id:
         try:
             crm_client = FeishuCrmClient()
