@@ -46,3 +46,4 @@ __pycache__/
 *.pptx
 *.xlsx
 *.csv
+.cozeproj/reduction
