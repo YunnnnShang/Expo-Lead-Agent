@@ -336,7 +336,6 @@ def _sanitize_crm_fields(fields: dict) -> dict:
     for k, v in fields.items():
         if k not in _CRM_FIELD_WHITELIST:
             continue
-        # 强制字符串类型处理（官网/邮箱/公司名称/备注/报告链接）
         if v is None or v is False:
             continue
         if k == "数据状态":
@@ -345,6 +344,14 @@ def _sanitize_crm_fields(fields: dict) -> dict:
                 sanitized[k] = sv
             else:
                 sanitized[k] = "待跟进"
+        elif k == "AI调研报告链接":
+            # 飞书超链接字段必须传结构化对象，不能传裸字符串
+            url_str = str(v).strip()
+            if url_str:
+                sanitized[k] = {
+                    "link": url_str,
+                    "text": "查看背调报告"
+                }
         else:
             sanitized[k] = str(v).strip() if v else ""
     return sanitized

@@ -63,12 +63,15 @@ def research_company_online(company_name: str, country: str = "", website: str =
             )
             items = []
             for item in (resp.web_items or []):
+                # 强制截断单条内容，防止Token爆炸
+                content = (item.content or "")[:1500] if item.content else ""
+                summary = (item.summary or "")[:500] if item.summary else ""
                 items.append({
                     "title": item.title,
                     "url": item.url,
                     "snippet": item.snippet,
-                    "summary": item.summary,
-                    "content": item.content
+                    "summary": summary,
+                    "content": content
                 })
             results["searches"].append({"query": q, "items": items})
         except Exception as e:
@@ -88,7 +91,11 @@ def research_company_online(company_name: str, country: str = "", website: str =
         except Exception as e:
             results["website_content"] = f"官网抓取失败: {e}"
 
-    return json.dumps(results, ensure_ascii=False, indent=2)
+    raw_result = json.dumps(results, ensure_ascii=False, indent=2)
+    # 强制截断防止Token爆炸撑爆Agent上下文
+    if len(raw_result) > 12000:
+        raw_result = raw_result[:12000] + "\n...[数据过长，底层代码已强制截断]..."
+    return raw_result
 
 
 @tool
@@ -203,7 +210,13 @@ def generate_company_report(company_name: str, research_data: str,
             crm_client = FeishuCrmClient()
             crm_client.update_record(
                 app_token, table_id, record_id,
-                {"AI调研报告链接": pdf_url, "数据状态": "调研完成"}
+                {
+                    "AI调研报告链接": {
+                        "link": pdf_url,
+                        "text": "查看背调报告"
+                    },
+                    "数据状态": "调研完成"
+                }
             )
         except Exception as e:
             # 回写失败不阻断，记录到结果中
